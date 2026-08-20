@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from .services.customer_service import get_all_customers, get_customer_by_id
+from .services.recommendation_service import get_customer_recommendation
 
 app = FastAPI(
     title="Nafis Copilot API",
@@ -38,3 +39,11 @@ def customer_detail(customer_id: str):
     if customer is None:
         raise HTTPException(status_code=404, detail="Customer not found")
     return customer
+
+
+@app.get("/api/customers/{customer_id}/recommendation")
+def customer_recommendation(customer_id: str):
+    recommendation = get_customer_recommendation(customer_id)
+    if recommendation is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return recommendation
