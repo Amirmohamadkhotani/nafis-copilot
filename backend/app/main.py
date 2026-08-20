@@ -1,5 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+from .services.customer_service import get_all_customers, get_customer_by_id
 
 app = FastAPI(
     title="Nafis Copilot API",
@@ -23,3 +25,16 @@ def health_check():
         "status": "ok",
         "service": "nafis-copilot-api"
     }
+
+
+@app.get("/api/customers")
+def list_customers():
+    return get_all_customers()
+
+
+@app.get("/api/customers/{customer_id}")
+def customer_detail(customer_id: str):
+    customer = get_customer_by_id(customer_id)
+    if customer is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return customer
