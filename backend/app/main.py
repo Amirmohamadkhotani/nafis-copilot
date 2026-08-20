@@ -2,7 +2,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from .services.customer_service import get_all_customers, get_customer_by_id
-from .services.recommendation_service import get_customer_recommendation
+from .services.recommendation_service import (
+    ACTIONABLE_RECOMMENDATION_TYPES,
+    get_all_recommendations,
+    get_customer_recommendation,
+)
 
 app = FastAPI(
     title="Nafis Copilot API",
@@ -47,3 +51,10 @@ def customer_recommendation(customer_id: str):
     if recommendation is None:
         raise HTTPException(status_code=404, detail="Customer not found")
     return recommendation
+
+
+@app.get("/api/recommendations")
+def recommendation_focus_list(type: str | None = None):
+    if type is not None and type not in ACTIONABLE_RECOMMENDATION_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid recommendation type")
+    return get_all_recommendations(type)
