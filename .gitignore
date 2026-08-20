@@ -22,3 +22,10 @@ Thumbs.db
 # Secrets
 *.env
 .env.*
+
+analysis/outputs/*.csv
+analysis/outputs/*.xlsx
+analysis/outputs/*.parquet
+
+analysis/outputs/*
+!analysis/outputs/.gitkeep
