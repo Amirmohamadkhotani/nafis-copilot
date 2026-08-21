@@ -240,7 +240,7 @@ export interface CopanCustomer {
   customer_name: string;
   location_id: string;
   location_name: string;
-  customer_segment: 'A' | 'B' | 'C';
+  customer_segment: string;
   sales_rep_id: string;
   sales_rep_name: string;
   lifetime_revenue: number;
@@ -254,7 +254,7 @@ export interface CopanCustomer {
   avg_delay_days: number;
   risk_score: number;
   opportunity_score: number;
-  health_status: 'Healthy' | 'Needs Attention' | 'At Risk';
+  health_status: string;
   rfm_score: string;
   rfm_segment: string;
   last_purchase_date: string;

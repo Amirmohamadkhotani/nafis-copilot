@@ -56,8 +56,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     customerName: string;
   }>({
     isOpen: false,
-    complaintId: 'CMP-0001',
-    customerName: 'صنایع نساجی سبلان پارچه',
+    complaintId: '',
+    customerName: 'داده کافی موجود نیست',
   });
 
   // Handlers
@@ -74,7 +74,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       setInteractionCustomerId(taskOrCustomerId);
       setInteractionTaskTitle(defaultTitle);
     } else {
-      setInteractionCustomerId(activeCustomer?.customer_id || 'CUST-008');
+      setInteractionCustomerId(activeCustomer?.customer_id || undefined);
       setInteractionTaskTitle(undefined);
     }
     setIsInteractionModalOpen(true);

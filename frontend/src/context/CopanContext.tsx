@@ -1,9 +1,5 @@
 import React, { createContext, useContext, useState , useEffect } from 'react';
 import {
-  COPAN_CUSTOMERS,
-  INITIAL_COPAN_TASKS,
-  INITIAL_COPAN_INTERACTIONS,
-  generateCobatResponse,
   type CopanCustomer,
   type CopanTask,
   type TaskState,
@@ -12,6 +8,20 @@ import {
   type CobatMessage,
   type CopanActionPriority,
 } from '../data/copanIntelligence';
+import { fetchCustomers } from '../api';
+
+const UNAVAILABLE = 'داده کافی موجود نیست';
+const EMPTY_CUSTOMER: CopanCustomer = {
+  customer_id: '', customer_name: UNAVAILABLE, location_id: '', location_name: UNAVAILABLE,
+  customer_segment: UNAVAILABLE, sales_rep_id: '', sales_rep_name: UNAVAILABLE,
+  lifetime_revenue: Number.NaN, revenue_trend_pct: Number.NaN,
+  avg_gross_margin_pct: Number.NaN, avg_nafis_share_pct: Number.NaN,
+  main_competitor: UNAVAILABLE, total_complaints: 0, high_severity_complaints: 0,
+  bounced_checks_count: 0, avg_delay_days: Number.NaN, risk_score: Number.NaN,
+  opportunity_score: Number.NaN, health_status: UNAVAILABLE, rfm_score: UNAVAILABLE,
+  rfm_segment: UNAVAILABLE, last_purchase_date: UNAVAILABLE, last_interaction_date: UNAVAILABLE,
+  payment_status: UNAVAILABLE, installment_share_pct: Number.NaN, latest_next_action: UNAVAILABLE,
+};
 
 export interface LogInteractionInput {
   customer_id: string;
@@ -74,20 +84,19 @@ interface CopanContextType {
 
 const CopanContext = createContext<CopanContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY_TASKS = 'copan_tasks_v2';
-const LOCAL_STORAGE_KEY_INTERACTIONS = 'copan_interactions_v2';
-const LOCAL_STORAGE_KEY_CUSTOMERS = 'copan_customers_v2';
+const LOCAL_STORAGE_KEY_TASKS = 'copan_tasks_v3';
+const LOCAL_STORAGE_KEY_INTERACTIONS = 'copan_interactions_v3';
 const LOCAL_STORAGE_KEY_THEME = 'copan_theme_v1';
 const LOCAL_STORAGE_KEY_RATE = 'copan_installment_rate_v1';
-const LOCAL_STORAGE_KEY_COBAT = 'copan_cobat_msgs_v1';
+const LOCAL_STORAGE_KEY_COBAT = 'copan_cobat_msgs_v2';
 const LOCAL_STORAGE_KEY_SELECTED_CUSTOMER = 'copan_selected_customer_v1';
 
 export const CopanProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [selectedCustomerId, setSelectedCustomerIdState] = useState<string>(() => {
     try {
-      return localStorage.getItem(LOCAL_STORAGE_KEY_SELECTED_CUSTOMER) || 'CUST-008';
+      return localStorage.getItem(LOCAL_STORAGE_KEY_SELECTED_CUSTOMER) || '';
     } catch {
-      return 'CUST-008';
+      return '';
     }
   });
 
@@ -123,39 +132,34 @@ export const CopanProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Customers with live dynamic state
-  const [customers, setCustomers] = useState<CopanCustomer[]>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY_CUSTOMERS);
-      return saved ? JSON.parse(saved) : COPAN_CUSTOMERS;
-    } catch {
-      return COPAN_CUSTOMERS;
-    }
-  });
+  const [customers, setCustomers] = useState<CopanCustomer[]>([]);
 
   useEffect(() => {
   const loadCustomers = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/customers');
-
-      if (!res.ok) {
-        throw new Error('Failed loading customers');
-      }
-
-      const data = await res.json();
-
-      const apiCustomers = data.customers || data;
+      const data = await fetchCustomers();
+      const apiCustomers: CopanCustomer[] = data.map((item) => ({
+        ...EMPTY_CUSTOMER,
+        customer_id: item.customer_id,
+        customer_name: UNAVAILABLE,
+        lifetime_revenue: item.historical_total_revenue ?? Number.NaN,
+        total_complaints: item.complaint_count,
+        bounced_checks_count: item.returned_check_count,
+        avg_delay_days: item.median_payment_delay_days ?? Number.NaN,
+        avg_gross_margin_pct: item.known_margin_pct ?? Number.NaN,
+        avg_nafis_share_pct: item.historical_wallet_share_pct ?? Number.NaN,
+      }));
 
       if (Array.isArray(apiCustomers) && apiCustomers.length > 0) {
         setCustomers(apiCustomers);
-        localStorage.setItem(
-          LOCAL_STORAGE_KEY_CUSTOMERS,
-          JSON.stringify(apiCustomers)
-        );
+        if (!selectedCustomerId || !apiCustomers.some((item) => item.customer_id === selectedCustomerId)) {
+          setSelectedCustomerId(apiCustomers[0].customer_id);
+        }
       }
 
     } catch (error) {
       console.warn(
-        'Backend unavailable, keeping mock customers',
+        'Backend customer data unavailable',
         error
       );
     }
@@ -185,7 +189,6 @@ export const CopanProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
         return c;
       });
-      localStorage.setItem(LOCAL_STORAGE_KEY_CUSTOMERS, JSON.stringify(updated));
       return updated;
     });
   };
@@ -194,9 +197,9 @@ export const CopanProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [tasks, setTasks] = useState<CopanTask[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY_TASKS);
-      return saved ? JSON.parse(saved) : INITIAL_COPAN_TASKS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_COPAN_TASKS;
+      return [];
     }
   });
 
@@ -310,9 +313,9 @@ export const CopanProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [interactions, setInteractions] = useState<CopanCRMInteraction[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY_INTERACTIONS);
-      return saved ? JSON.parse(saved) : INITIAL_COPAN_INTERACTIONS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_COPAN_INTERACTIONS;
+      return [];
     }
   });
 
@@ -438,10 +441,7 @@ export const CopanProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         id: 'cobat-init',
         sender: 'cobat',
         timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
-        text: `به **مرکز فرماندهی فروش و تصمیم‌ساز هوشمند COPAN** خوش آمدید.
-تمامی اقدامات، هشدارها و پیگیری‌ها مستقیماً بر اساس وضعیت جاری مشتریان و پایگاه داده استخراج شده‌اند.
-
-برای هر مشتری می‌توانید دلیل قرارگیری در وضعیت، اقدام بهینه و پیگیری‌های بعدی را بررسی فرمایید.`,
+        text: 'داده کافی موجود نیست؛ سرویس گفت‌وگوی COBAT در backend فعلی پشتیبانی نمی‌شود.',
       },
     ];
   });
@@ -464,10 +464,14 @@ export const CopanProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsCobatTyping(true);
 
     setTimeout(() => {
-      const response = generateCobatResponse(trimmed, {
-        page: contextPage,
-        customerId: selectedCustomerId,
-      });
+      const response: CobatMessage = {
+        id: 'cobat-unavailable-' + Date.now(),
+        sender: 'cobat',
+        timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+        text: 'داده کافی موجود نیست؛ سرویس گفت‌وگوی COBAT در backend فعلی پشتیبانی نمی‌شود.',
+        context_page: contextPage,
+        customer_id: selectedCustomerId || undefined,
+      };
 
       const updated = [...newMsgs, response];
       setCobatMessages(updated);
@@ -490,7 +494,7 @@ export const CopanProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const activeCustomer =
-    customers.find((c) => c.customer_id === selectedCustomerId) || customers[0];
+    customers.find((c) => c.customer_id === selectedCustomerId) || customers[0] || EMPTY_CUSTOMER;
 
   return (
     <CopanContext.Provider

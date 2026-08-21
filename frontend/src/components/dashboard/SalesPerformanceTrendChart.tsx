@@ -11,7 +11,8 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
-import { COPAN_SALES_TREND } from '../../data/copanIntelligence';
+type MockDataModule = typeof import('../../data/copanIntelligence');
+const COPAN_SALES_TREND: MockDataModule['COPAN_SALES_TREND'] = [];
 
 export const SalesPerformanceTrendChart: React.FC = () => {
   const [timeRange, setTimeRange] = useState<'3M' | '6M' | '12M'>('12M');
@@ -29,6 +30,10 @@ export const SalesPerformanceTrendChart: React.FC = () => {
   const avgPeriodMargin = (
     filteredTrend.reduce((acc, curr) => acc + curr.avg_margin_pct, 0) / (filteredTrend.length || 1)
   ).toFixed(1);
+
+  if (filteredTrend.length === 0) {
+    return <div className="copan-card min-h-32 flex items-center justify-center text-[13px] text-[var(--text-faint)]">داده کافی موجود نیست</div>;
+  }
 
   return (
     <div className="copan-card space-y-4">

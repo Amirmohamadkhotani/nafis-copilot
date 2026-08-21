@@ -66,7 +66,7 @@ export const AICopilotPanel: React.FC<AICopilotPanelProps> = ({
     'فرصت‌های رشد سهم سبد را نشان بده',
     currentCustomerId
       ? `چرا فروش مشتری ${currentCustomerId} افت کرده؟`
-      : 'چرا فروش مشتری C_773326 افت کرده؟',
+      : 'چرا وضعیت این مشتری تغییر کرده است؟',
     currentCustomerId
       ? `برای جلسه با ${currentCustomerId} چه نکاتی مهم است؟`
       : 'شکایات باز و بحرانی کدامند؟',
@@ -254,7 +254,7 @@ export const AICopilotPanel: React.FC<AICopilotPanelProps> = ({
           ref={inputRef}
           type="text"
           className="input-field flex-1 text-xs"
-          placeholder="پرسش خود را بپرسید (مثال: وضعیت فروش C_773326)..."
+                  placeholder="پرسش خود را درباره مشتری انتخاب‌شده بپرسید..."
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
           disabled={isLoading}

@@ -6,7 +6,10 @@ import {
   Percent,
 } from 'lucide-react';
 import { useCopan } from '../context/CopanContext';
-import { COPAN_SETTINGS_DATA } from '../data/copanIntelligence';
+type MockDataModule = typeof import('../data/copanIntelligence');
+const COPAN_SETTINGS_DATA = {
+  data_sources: [], report_schedules: [],
+} as unknown as MockDataModule['COPAN_SETTINGS_DATA'];
 
 export const SettingsPage: React.FC = () => {
   const {
@@ -37,6 +40,9 @@ export const SettingsPage: React.FC = () => {
     setTimeout(() => setSaveSuccess(false), 3000);
   };
 
+  return <div className="copan-card min-h-64 flex items-center justify-center text-[13px] text-[var(--text-faint)]">داده کافی موجود نیست؛ endpoint تنظیمات و وضعیت منابع داده موجود نیست.</div>;
+
+  /* Legacy layout retained for a future supported endpoint. */
   return (
     <div className="space-y-6 animate-in fade-in duration-150">
       {/* Header */}

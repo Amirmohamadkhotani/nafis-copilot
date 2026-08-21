@@ -143,3 +143,44 @@ export interface UnavailableFeature {
   available: false;
   reason: 'not_supported_by_backend';
 }
+
+export interface Customer360Response {
+  customer_id: string;
+  profile: {
+    customer_name: string | null;
+    customer_id: string;
+    segment: string | null;
+    location: string | null;
+    sales_rep: string | null;
+    status: string | null;
+    source: string | null;
+  };
+  commercial: {
+    lifetime_revenue: number | null;
+    invoice_count: number;
+    last_invoice: {
+      invoice_number: string | null;
+      invoice_date: string | null;
+      amount: number | null;
+      source: string | null;
+    } | null;
+    source: string;
+  };
+  financial: {
+    credit_limit: number | null;
+    payment_terms_days: number | null;
+    median_payment_delay_days: number | null;
+    returned_check_count: number;
+    collection_count: number;
+    total_collected: number | null;
+    outstanding_amount: number | null;
+    outstanding_method: string;
+    recent_collections: Array<Record<string, string | number | boolean | null>>;
+  };
+  complaints: Array<Record<string, string | number | boolean | null>>;
+  interactions: Array<Record<string, string | number | boolean | null>>;
+  offers: Array<Record<string, string | number | boolean | null>>;
+  products: Array<Record<string, string | number | boolean | null>>;
+  rfm: CustomerRfm;
+  recommendation: CustomerRecommendation;
+}

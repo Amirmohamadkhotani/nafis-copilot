@@ -26,7 +26,7 @@ export const TaskManagementBlock: React.FC<TaskManagementBlockProps> = ({
   onSelectCustomer,
   onNavigate,
 }) => {
-  const { tasks, updateTaskStatus, addTask } = useCopan();
+  const { tasks, customers, updateTaskStatus, addTask } = useCopan();
 
   const [statusTab, setStatusTab] = useState<TaskState | 'ALL'>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'ALL'>('ALL');
@@ -35,11 +35,11 @@ export const TaskManagementBlock: React.FC<TaskManagementBlockProps> = ({
 
   // New task form state
   const [newTitle, setNewTitle] = useState('');
-  const newCustomerId = 'CUST-008';
-  const [newCustomerName, setNewCustomerName] = useState('صنایع نساجی سبلان پارچه');
+  const newCustomerId = customers[0]?.customer_id ?? '';
+  const [newCustomerName, setNewCustomerName] = useState('داده کافی موجود نیست');
   const [newReason, setNewReason] = useState('');
   const [newPriority, setNewPriority] = useState<TaskPriority>('High');
-  const [newDueDate, setNewDueDate] = useState('۳ روز مانده');
+  const [newDueDate, setNewDueDate] = useState('');
 
   const filteredTasks = tasks.filter((t) => {
     if (statusTab !== 'ALL' && t.status !== statusTab) return false;

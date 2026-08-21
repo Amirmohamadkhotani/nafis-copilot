@@ -5,9 +5,10 @@ import {
   Bot,
 } from 'lucide-react';
 import type { PageId } from '../components/layout/Sidebar';
-import {
-  COPAN_SALES_INTELLIGENCE,
-} from '../data/copanIntelligence';
+type MockDataModule = typeof import('../data/copanIntelligence');
+const COPAN_SALES_INTELLIGENCE = {
+  growing_customers: [], declining_customers: [], product_families: [], color_groups: [],
+} as unknown as MockDataModule['COPAN_SALES_INTELLIGENCE'];
 
 interface SalesIntelligencePageProps {
   onNavigate: (page: PageId) => void;
@@ -22,6 +23,9 @@ export const SalesIntelligencePage: React.FC<SalesIntelligencePageProps> = ({
   onSelectCustomer,
   onOpenCobat,
 }) => {
+  return <div className="copan-card min-h-64 flex items-center justify-center text-[13px] text-[var(--text-faint)]">داده کافی موجود نیست؛ endpoint تحلیل تجمیعی فروش در backend فعلی موجود نیست.</div>;
+
+  /* Legacy layout retained for a future supported endpoint. */
   return (
     <div className="space-y-6 animate-in fade-in duration-150">
       {/* Header & Pareto Callout */}
@@ -53,7 +57,7 @@ export const SalesIntelligencePage: React.FC<SalesIntelligencePageProps> = ({
           <div>
             <div className="text-[11px] text-[var(--text-faint)]">تمرکز فروش (قانون پارتو)</div>
             <div className="font-mono font-extrabold text-[20px] text-[var(--gold)] mt-0.5">
-              ۷۸.۴٪ <small className="text-[12px] font-sans font-bold text-[var(--text)]">از ۱۰٪ مشتریان</small>
+              داده کافی موجود نیست
             </div>
           </div>
           <div>

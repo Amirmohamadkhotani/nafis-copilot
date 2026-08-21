@@ -28,6 +28,13 @@ export const BusinessSituationStrip: React.FC<BusinessSituationStripProps> = ({
   ).length;
 
   return (
+    <div className="copan-card min-h-32 flex items-center justify-center text-[13px] text-[var(--text-faint)]">
+      داده کافی موجود نیست؛ endpoint شاخص‌های عملیاتی داشبورد در backend فعلی موجود نیست.
+    </div>
+  );
+
+  /* Legacy layout retained for future backend mapping. */
+  return (
     <div className="space-y-3">
       {/* Section Subtitle */}
       <div className="flex items-center justify-between text-[13px]">

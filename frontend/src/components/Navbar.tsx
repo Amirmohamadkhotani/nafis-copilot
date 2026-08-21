@@ -56,7 +56,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <input
                 type="text"
                 className="input-field w-full pr-8 pl-3 text-xs rounded-[8px]"
-                placeholder="جستجوی هوشمند مشتری، شناسه، شهر (مثال: CUST-008، C_773326)..."
+                placeholder="جستجوی هوشمند مشتری، شناسه یا شهر..."
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
               />

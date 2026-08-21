@@ -3,7 +3,8 @@ import {
   Bot,
 } from 'lucide-react';
 import type { PageId } from '../components/layout/Sidebar';
-import { COPAN_MARKET_INTELLIGENCE } from '../data/copanIntelligence';
+import type { CopanMarketReport } from '../data/copanIntelligence';
+const COPAN_MARKET_INTELLIGENCE: CopanMarketReport[] = [];
 
 interface MarketIntelligencePageProps {
   onNavigate?: (page: PageId) => void;
@@ -19,6 +20,10 @@ export const MarketIntelligencePage: React.FC<MarketIntelligencePageProps> = ({
     if (filterType !== 'ALL' && rep.analysis_type !== filterType) return false;
     return true;
   });
+
+  if (filteredReports.length === 0) {
+    return <div className="copan-card min-h-64 flex items-center justify-center text-[13px] text-[var(--text-faint)]">داده کافی موجود نیست؛ endpoint هوش بازار در backend فعلی موجود نیست.</div>;
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-150">

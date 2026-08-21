@@ -10,7 +10,6 @@ import {
   Globe2,
   AlertTriangle,
   Settings,
-  ChevronLeft,
   X,
 } from 'lucide-react';
 
@@ -29,9 +28,7 @@ export type PageId =
 interface NavItem {
   id: PageId;
   label: string;
-  sublabel?: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
-  badge?: string;
   count?: number;
   badgeColor?: string;
 }
@@ -58,7 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
   isOpenMobile = false,
   onCloseMobile,
-  counts = { priorities: 6, risks: 4, opportunities: 24 },
+  counts = {},
 }) => {
   const navSections: NavSection[] = [
     {
@@ -68,8 +65,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           id: 'dashboard',
           label: 'مرکز فرماندهی فروش',
           icon: LayoutDashboard,
-          badge: 'Live',
-          badgeColor: 'badge-gold',
         },
       ],
     },
@@ -79,10 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {
           id: 'cobat',
           label: 'کوبات (COBAT)',
-          sublabel: 'دستیار تصمیم‌ساز',
           icon: Bot,
-          badge: 'AI',
-          badgeColor: 'badge-gold',
         },
       ],
     },
@@ -146,35 +138,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 right-0 w-[260px] border-l border-[var(--hair)] z-50 flex flex-col transition-transform duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:translate-x-0 ${
+        className={`fixed top-0 bottom-0 right-0 w-[260px] bg-[var(--bg-soft)] border-l border-[var(--hair)] z-50 flex flex-col transition-transform duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:translate-x-0 ${
           isOpenMobile ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
         }`}
-        style={{
-          background: 'linear-gradient(185deg, var(--bg-soft), #ece3cd 78%)',
-        }}
       >
         {/* Brand Header */}
-        <div className="p-5 border-b border-[var(--hair)] flex items-center justify-between">
+        <div className="p-4 border-b border-[var(--hair)] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <svg width="30" height="30" viewBox="0 0 30 30" fill="none" className="shrink-0">
-              <circle cx="15" cy="6.2" r="2.2" fill="#a97c22" />
-              <path
-                d="M15 10c-6.5 0-10.5 5.4-10.5 11.2C4.5 24.7 8 27 15 27s10.5-2.3 10.5-5.8C25.5 15.4 21.5 10 15 10Z"
-                stroke="#182a1d"
-                strokeWidth="1.6"
-              />
-            </svg>
+            <div className="bg-white/80 dark:bg-white/10 px-2 py-1 rounded-lg border border-[var(--hair)] flex items-center justify-center">
+              <img src="/copan-logo.png" alt="COPAN - کوپان" className="h-6 w-auto object-contain" />
+            </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-[16.5px] tracking-tight text-[var(--text)]">
+                <span className="font-extrabold text-[15px] tracking-tight text-[var(--text)]">
                   نفیس‌نخ
                 </span>
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-[var(--gold-soft)] text-[var(--gold)] border border-[var(--gold)]/30">
-                  COPAN
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--panel-2)] text-[var(--text-faint)]">
+                  v2.0
                 </span>
               </div>
-              <p className="text-[10.5px] text-[var(--text-faint)] leading-none mt-1">
-                داشبورد هوش تجاری و تصمیم‌ساز
+              <p className="text-[10.5px] text-[var(--text-faint)] leading-none mt-0.5">
+                سامانه هوش فروش و تصمیم‌ساز
               </p>
             </div>
           </div>
@@ -193,7 +177,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex-1 overflow-y-auto px-3.5 py-4 space-y-4">
           {navSections.map((section, sIdx) => (
             <div key={sIdx} className="space-y-1">
-              <div className="px-2.5 text-[10.5px] font-bold text-[var(--text-faint)] tracking-wider">
+              <div className="px-2.5 text-[11px] font-bold text-[var(--text-faint)] tracking-wider">
                 {section.groupLabel}
               </div>
 
@@ -211,9 +195,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           onCloseMobile();
                         }
                       }}
-                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-[10px] text-[13px] transition-all duration-150 text-right cursor-pointer group ${
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-[13px] transition-all duration-150 text-right cursor-pointer group ${
                         isActive
-                          ? 'bg-[var(--panel-2)] text-[var(--gold)] font-bold border border-[var(--hair-strong)] shadow-xs'
+                          ? 'bg-[var(--panel)] text-[var(--gold)] font-bold shadow-sm'
                           : 'text-[var(--text-dim)] hover:bg-[var(--panel-2)] hover:text-[var(--text)]'
                       }`}
                     >
@@ -228,28 +212,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {item.badge && (
-                          <span className="copan-badge badge-gold text-[9.5px]">
-                            {item.badge}
-                          </span>
-                        )}
                         {typeof item.count === 'number' && item.count > 0 && (
                           <span
                             className={`text-[10.5px] font-mono font-bold px-2 py-0.2 rounded-full ${
                               item.badgeColor === 'badge-risk'
                                 ? 'bg-[var(--risk-soft)] text-[var(--risk)]'
-                                : 'bg-[var(--gold-soft)] text-[var(--gold)]'
+                              : 'bg-[var(--gold-soft)] text-[var(--gold)]'
                             }`}
                           >
                             {item.count}
                           </span>
                         )}
-                        <ChevronLeft
-                          size={13}
-                          className={`opacity-0 group-hover:opacity-100 transition-opacity ${
-                            isActive ? 'opacity-100 text-[var(--gold)]' : 'text-[var(--text-faint)]'
-                          }`}
-                        />
                       </div>
                     </button>
                   );
@@ -260,14 +233,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-[var(--hair)] space-y-2">
-          <div className="inline-flex items-center gap-1.5 text-[10.5px] font-bold text-[var(--gold)] bg-[var(--gold-soft)] border border-[var(--gold)]/25 px-2.5 py-1 rounded-full">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--gold)] animate-pulse" />
-            <span>پایگاه داده زنده نفیس‌نخ</span>
-          </div>
-          <p className="text-[10.5px] text-[var(--text-faint)] leading-relaxed">
-            نسخهٔ متصل به موتور تصمیم‌ساز عاملی COBAT و داده‌های فروش.
-          </p>
+        <div className="p-4 border-t border-[var(--hair)] flex items-center justify-center">
+          <span className="text-[11px] font-medium text-[var(--text-faint)]">COPAN نسخه ۲.۰</span>
         </div>
       </aside>
     </>

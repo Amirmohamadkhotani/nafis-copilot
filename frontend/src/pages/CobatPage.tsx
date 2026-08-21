@@ -20,40 +20,9 @@ interface CobatPageProps {
   selectedCustomerId: string;
 }
 
-const DEMO_SCENARIOS = [
-  {
-    id: 'spot_deterioration',
-    title: 'پایش حساب‌های در معرض ریزش',
-    prompt: 'مشتری‌هایی که وضعیت‌شان در حال بدتر شدن است را پیدا کن و علت را توضیح بده.',
-    tag: 'ریسک ریزش',
-    tagColor: 'badge-risk',
-    targetCustomerId: 'CUST-008',
-  },
-  {
-    id: 'growth_opportunity',
-    title: 'کشف فرصت‌های رشد و سهم سبد',
-    prompt: 'مشتری‌های سودآور با سهم سبد پایین از نفیس را پیدا کن.',
-    tag: 'فرصت رشد',
-    tagColor: 'badge-positive',
-    targetCustomerId: 'CUST-003',
-  },
-  {
-    id: 'quality_root_cause',
-    title: 'تحلیل ریشه‌ای کیفیت و آزمون آزمایشگاه',
-    prompt: 'آیا شکایت مشتری CUST-015 واقعاً ناشی از نقص کیفی در خط تولید بوده است؟',
-    tag: 'کیفیت و QMS',
-    tagColor: 'badge-gold',
-    targetCustomerId: 'CUST-015',
-  },
-  {
-    id: 'meeting_brief',
-    title: 'آماده‌سازی مذاکره تجاری (Meeting Brief)',
-    prompt: 'فردا با مشتری CUST-010 جلسه دارم. چه نکاتی و آفر قیمتی را باید آماده کنم؟',
-    tag: 'مذاکره CRM',
-    tagColor: 'badge-brand',
-    targetCustomerId: 'CUST-010',
-  },
-];
+const DEMO_SCENARIOS: Array<{
+  id: string; title: string; prompt: string; tag: string; tagColor: string; targetCustomerId: string;
+}> = [];
 
 export const CobatPage: React.FC<CobatPageProps> = ({
   onNavigate,

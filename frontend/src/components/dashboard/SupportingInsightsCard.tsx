@@ -4,10 +4,9 @@ import {
   Sparkles,
   ChevronLeft,
 } from 'lucide-react';
-import {
-  COPAN_OPPORTUNITIES,
-  COPAN_ALERTS,
-} from '../../data/copanIntelligence';
+type MockDataModule = typeof import('../../data/copanIntelligence');
+const COPAN_OPPORTUNITIES: MockDataModule['COPAN_OPPORTUNITIES'] = [];
+const COPAN_ALERTS = { loss_alerts: [] } as unknown as MockDataModule['COPAN_ALERTS'];
 import type { PageId } from '../layout/Sidebar';
 
 interface SupportingInsightsCardProps {
@@ -23,6 +22,10 @@ export const SupportingInsightsCard: React.FC<SupportingInsightsCardProps> = ({
 }) => {
   const topOpportunities = COPAN_OPPORTUNITIES.slice(0, 3);
   const criticalLossAlerts = COPAN_ALERTS.loss_alerts.slice(0, 2);
+
+  if (topOpportunities.length === 0 && criticalLossAlerts.length === 0) {
+    return <div className="copan-card min-h-32 flex items-center justify-center text-[13px] text-[var(--text-faint)]">داده کافی موجود نیست</div>;
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

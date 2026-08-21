@@ -8,13 +8,12 @@ import {
   PhoneCall,
   Layers,
 } from 'lucide-react';
-import {
-  COPAN_DELAYED_COLLECTIONS,
-  COPAN_BOUNCED_CHECKS,
-  COPAN_OPEN_COMPLAINTS_DETAILS,
-  COPAN_PENDING_OFFERS_DETAILS,
-  COPAN_ALERTS,
-} from '../../data/copanIntelligence';
+type MockDataModule = typeof import('../../data/copanIntelligence');
+const COPAN_DELAYED_COLLECTIONS: MockDataModule['COPAN_DELAYED_COLLECTIONS'] = [];
+const COPAN_BOUNCED_CHECKS: MockDataModule['COPAN_BOUNCED_CHECKS'] = [];
+const COPAN_OPEN_COMPLAINTS_DETAILS: MockDataModule['COPAN_OPEN_COMPLAINTS_DETAILS'] = [];
+const COPAN_PENDING_OFFERS_DETAILS: MockDataModule['COPAN_PENDING_OFFERS_DETAILS'] = [];
+const COPAN_ALERTS = { loss_alerts: [] } as unknown as MockDataModule['COPAN_ALERTS'];
 import type { PageId } from '../layout/Sidebar';
 
 export type OperationalViewType =
@@ -46,6 +45,15 @@ export const OperationalDetailModal: React.FC<OperationalDetailModalProps> = ({
 }) => {
   if (!isOpen || !viewType) return null;
 
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="copan-card min-h-40 w-full max-w-lg flex items-center justify-center text-[13px] text-[var(--text-faint)]" onClick={(event) => event.stopPropagation()}>
+        داده کافی موجود نیست
+      </div>
+    </div>
+  );
+
+  /* Legacy layout retained for a future supported endpoint. */
   const titles: Record<string, { title: string; subtitle: string; icon: any; badge: string }> = {
     COLLECTIONS: {
       title: 'پایش و مدیریت وصول مطالبات معوق (Delayed Collections)',
@@ -79,7 +87,7 @@ export const OperationalDetailModal: React.FC<OperationalDetailModalProps> = ({
     },
   };
 
-  const currentMeta = titles[viewType] || titles.COLLECTIONS;
+  const currentMeta = titles[viewType!] || titles.COLLECTIONS;
   const Icon = currentMeta.icon;
 
   return (

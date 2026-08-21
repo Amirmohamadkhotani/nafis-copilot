@@ -207,6 +207,10 @@ const TOP_5_CRITICAL_CUSTOMERS: SpotlightCustomer[] = [
   },
 ];
 
+// Spotlight ranking is not available from the current backend contract.
+TOP_5_BEST_CUSTOMERS.length = 0;
+TOP_5_CRITICAL_CUSTOMERS.length = 0;
+
 interface CustomersPageProps {
   onNavigate: (page: PageId) => void;
   onSelectCustomer: (customerId: string) => void;
@@ -773,15 +777,15 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
               <div className="grid grid-cols-3 gap-2 text-[11.5px] p-2.5 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)]">
                 <div>
                   <div className="text-[10px] text-[var(--text-faint)]">فروش (م.ر)</div>
-                  <div className="font-mono font-bold text-[var(--text)]">{(cust.lifetime_revenue / 1000000).toFixed(0)}</div>
+                  <div className="font-mono font-bold text-[var(--text)]">{Number.isFinite(cust.lifetime_revenue) ? (cust.lifetime_revenue / 1000000).toFixed(0) : 'داده کافی موجود نیست'}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-[var(--text-faint)]">شاخص ریسک</div>
-                  <div className="font-mono font-bold text-[var(--risk)]">{cust.risk_score}</div>
+                  <div className="font-mono font-bold text-[var(--risk)]">{Number.isFinite(cust.risk_score) ? cust.risk_score : 'داده کافی موجود نیست'}</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-[var(--text-faint)]">سهم سبد</div>
-                  <div className="font-mono font-bold text-[var(--positive)]">{cust.avg_nafis_share_pct}٪</div>
+                  <div className="font-mono font-bold text-[var(--positive)]">{Number.isFinite(cust.avg_nafis_share_pct) ? `${cust.avg_nafis_share_pct}٪` : 'داده کافی موجود نیست'}</div>
                 </div>
               </div>
 
@@ -873,7 +877,7 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
                     </td>
                     <td className="text-[12.5px] text-[var(--text-dim)] font-medium">{cust.sales_rep_name}</td>
                     <td className="font-mono font-bold text-[var(--text)] text-[13.5px]">
-                      {(cust.lifetime_revenue / 1000000).toFixed(0)}
+                      {Number.isFinite(cust.lifetime_revenue) ? (cust.lifetime_revenue / 1000000).toFixed(0) : 'داده کافی موجود نیست'}
                     </td>
                     <td className="font-mono font-bold text-[13.5px]">
                       <span
@@ -881,14 +885,14 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
                           cust.revenue_trend_pct >= 0 ? 'text-[var(--positive)]' : 'text-[var(--risk)]'
                         }
                       >
-                        {cust.revenue_trend_pct >= 0
+                        {!Number.isFinite(cust.revenue_trend_pct) ? 'داده کافی موجود نیست' : cust.revenue_trend_pct >= 0
                           ? `+${cust.revenue_trend_pct}%`
                           : `${cust.revenue_trend_pct}%`}
                       </span>
                     </td>
-                    <td className="font-mono font-bold text-[13.5px]">{cust.avg_gross_margin_pct}٪</td>
+                    <td className="font-mono font-bold text-[13.5px]">{Number.isFinite(cust.avg_gross_margin_pct) ? `${cust.avg_gross_margin_pct}٪` : 'داده کافی موجود نیست'}</td>
                     <td>
-                      <div className="font-mono font-bold text-[var(--text)] text-[13.5px]">{cust.avg_nafis_share_pct}٪</div>
+                      <div className="font-mono font-bold text-[var(--text)] text-[13.5px]">{Number.isFinite(cust.avg_nafis_share_pct) ? `${cust.avg_nafis_share_pct}٪` : 'داده کافی موجود نیست'}</div>
                       <div className="text-[11.5px] text-[var(--gold)] font-bold">{cust.main_competitor}</div>
                     </td>
                     <td>
@@ -901,12 +905,12 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
                             : 'badge-positive'
                         }`}
                       >
-                        {cust.risk_score}
+                        {Number.isFinite(cust.risk_score) ? cust.risk_score : 'داده کافی موجود نیست'}
                       </span>
                     </td>
                     <td>
                       <span className="copan-badge badge-brand font-mono">
-                        {cust.opportunity_score}
+                        {Number.isFinite(cust.opportunity_score) ? cust.opportunity_score : 'داده کافی موجود نیست'}
                       </span>
                     </td>
                     <td>
@@ -923,7 +927,7 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({
                           ? 'در معرض ریزش'
                           : cust.health_status === 'Needs Attention'
                           ? 'نیازمند توجه'
-                          : 'سالم'}
+                          : cust.health_status === 'Healthy' ? 'سالم' : 'داده کافی موجود نیست'}
                       </span>
                     </td>
                     <td className="max-w-[200px] truncate text-[12px] text-[var(--text-dim)] font-medium">

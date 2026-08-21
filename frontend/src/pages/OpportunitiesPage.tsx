@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   PieChart,
   Bot,
@@ -6,7 +6,8 @@ import {
   Calendar,
 } from 'lucide-react';
 import type { PageId } from '../components/layout/Sidebar';
-import { COPAN_OPPORTUNITIES, type CopanOpportunity } from '../data/copanIntelligence';
+import type { CopanOpportunity } from '../data/copanIntelligence';
+import { fetchRecommendations } from '../api';
 import { ActionModal } from '../components/modals/ActionModal';
 
 interface OpportunitiesPageProps {
@@ -23,13 +24,38 @@ export const OpportunitiesPage: React.FC<OpportunitiesPageProps> = ({
   const [modelFilter, setModelFilter] = useState<'ALL' | 'PURCHASE_PROBABILITY' | 'BASKET_SHARE_DECLINE'>('ALL');
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [selectedOpp, setSelectedOpp] = useState<CopanOpportunity | null>(null);
+  const [opportunities, setOpportunities] = useState<CopanOpportunity[]>([]);
 
-  const filteredOpps = COPAN_OPPORTUNITIES.filter((opp) => {
+  useEffect(() => {
+    let current = true;
+    fetchRecommendations('GROW').then((response) => {
+      if (!current) return;
+      setOpportunities(response.recommendations.map((item) => ({
+        id: `REC-${item.customer_id}`,
+        model_type: 'BASKET_SHARE_DECLINE',
+        customer_id: item.customer_id,
+        customer_name: 'داده کافی موجود نیست',
+        opportunity_title: item.summary ?? 'فرصت توسعه فروش',
+        probability_pct: Number.NaN,
+        potential_revenue: Number.NaN,
+        customer_segment: 'داده کافی موجود نیست',
+        reason: item.summary ?? 'داده کافی موجود نیست',
+        evidence: item.suspended_opportunities.map((entry) => entry.note),
+        recommended_action: item.next_best_action ?? 'داده کافی موجود نیست',
+        expected_close_days: Number.NaN,
+        score: Number.NaN,
+      })));
+    }).catch(() => { if (current) setOpportunities([]); });
+    return () => { current = false; };
+  }, []);
+
+  const filteredOpps = opportunities.filter((opp) => {
     if (modelFilter !== 'ALL' && opp.model_type !== modelFilter) return false;
     return true;
   });
 
-  const totalPotentialRevenue = filteredOpps.reduce((acc, curr) => acc + curr.potential_revenue, 0);
+  const supportedPotentialRevenue = filteredOpps.filter((item) => Number.isFinite(item.potential_revenue));
+  const totalPotentialRevenue = supportedPotentialRevenue.reduce((acc, curr) => acc + curr.potential_revenue, 0);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-150">
@@ -116,7 +142,7 @@ export const OpportunitiesPage: React.FC<OpportunitiesPageProps> = ({
             <div>
               <div className="text-[11px] font-bold text-[var(--gold)]">مجموع پتانسیل درآمدی فعال</div>
               <div className="text-[24px] font-extrabold font-mono text-[var(--text)] mt-1">
-                {(totalPotentialRevenue / 1000000).toFixed(0)} <small className="text-[13px] font-sans font-bold text-[var(--gold)]">میلیون ریال</small>
+                {supportedPotentialRevenue.length ? <>{(totalPotentialRevenue / 1000000).toFixed(0)} <small className="text-[13px] font-sans font-bold text-[var(--gold)]">میلیون ریال</small></> : 'داده کافی موجود نیست'}
               </div>
             </div>
             <div className="text-[10.5px] text-[var(--positive)] font-medium pt-2 border-t border-[var(--hair)]">
@@ -160,11 +186,11 @@ export const OpportunitiesPage: React.FC<OpportunitiesPageProps> = ({
               <div className="flex items-center gap-3 text-[12px]">
                 <span className="text-[var(--text-faint)]">احتمال تحقق:</span>
                 <span className="copan-badge badge-positive font-mono text-[12px] font-bold">
-                  {opp.probability_pct}٪
+                  {Number.isFinite(opp.probability_pct) ? `${opp.probability_pct}٪` : 'داده کافی موجود نیست'}
                 </span>
                 <span className="text-[var(--text-faint)] mr-2">درآمد بالقوه:</span>
                 <b className="font-mono text-[14px] text-[var(--text)]">
-                  {(opp.potential_revenue / 1000000).toFixed(0)} م.ر
+                  {Number.isFinite(opp.potential_revenue) ? `${(opp.potential_revenue / 1000000).toFixed(0)} م.ر` : 'داده کافی موجود نیست'}
                 </b>
               </div>
             </div>
@@ -201,7 +227,7 @@ export const OpportunitiesPage: React.FC<OpportunitiesPageProps> = ({
                   {opp.recommended_action}
                 </div>
                 <div className="text-[10.5px] text-[var(--text-faint)]">
-                  زمان تخمینی بستن معامله: <b>{opp.expected_close_days} روز</b>
+                  زمان تخمینی بستن معامله: <b>{Number.isFinite(opp.expected_close_days) ? `${opp.expected_close_days} روز` : 'داده کافی موجود نیست'}</b>
                 </div>
               </div>
 

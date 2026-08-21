@@ -119,7 +119,7 @@ export const CustomerFollowupsCard: React.FC<CustomerFollowupsCardProps> = ({
 
                 <div className="text-[11.5px] text-[var(--text-dim)] pt-1 border-t border-[var(--hair)]">
                   <span className="font-bold text-[var(--text-faint)]">علت پیشنهاد: </span>
-                  <span>{cust.next_step_reason || `شاخص ریسک ${cust.risk_score} و روند فروش ${cust.revenue_trend_pct}%`}</span>
+                          <span>{cust.next_step_reason || 'داده کافی موجود نیست'}</span>
                 </div>
               </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Building2,
   TrendingUp,
@@ -33,9 +33,8 @@ import {
   CartesianGrid,
 } from 'recharts';
 import type { PageId } from '../components/layout/Sidebar';
-import {
-  getDetailedCustomer360,
-} from '../data/copanIntelligence';
+import { fetchCustomer360 } from '../api';
+import type { Customer360Response, CustomerSignal, RecommendationType } from '../types';
 import { QualityChainModal } from '../components/modals/QualityChainModal';
 import { ActionModal } from '../components/modals/ActionModal';
 
@@ -66,23 +65,197 @@ type TabKey =
   | 'nba'
   | 'evidence_trust';
 
-const QUICK_KEY_CUSTOMERS = [
-  { id: 'CUST-008', name: 'سبلان پارچه' },
-  { id: 'C_535756', name: 'پرنیان مشهد' },
-  { id: 'C_683666', name: 'تار و پود اصفهان' },
-  { id: 'CUST-003', name: 'تریکو البرز' },
-  { id: 'CUST-010', name: 'تکمیل ماهان' },
-  { id: 'C_245948', name: 'اطلس یزد' },
-  { id: 'C_948070', name: 'بهارستان قزوین' },
-  { id: 'CUST-001', name: 'تابیده‌باف کاشان' },
-];
+const UNAVAILABLE = 'داده کافی موجود نیست';
+
+const RECOMMENDATION_LABELS: Record<RecommendationType, string> = {
+  PROTECT_FIX: 'رفع ریسک پیش از توسعه فروش',
+  GROW: 'فرصت توسعه فروش',
+  REDUCE_FOCUS: 'بازبینی صرفه اقتصادی حساب',
+};
+
+const SIGNAL_LABELS: Record<CustomerSignal['type'], string> = {
+  QUALITY_RISK: 'ریسک کیفیت',
+  PAYMENT_RISK: 'ریسک پرداخت',
+  GROWTH_SIGNAL: 'سیگنال فرصت رشد',
+  PROFITABILITY_SIGNAL: 'سیگنال سودآوری',
+};
+
+const PRIORITY_LABELS: Record<string, string> = {
+  Critical: 'بحرانی', High: 'بالا', Medium: 'متوسط', Low: 'پایین',
+};
+
+const METRIC_LABELS: Record<string, string> = {
+  open_complaints: 'شکایت باز',
+  open_complaint_count: 'شکایت باز',
+  high_severity_complaints: 'شکایت با شدت بالا',
+  high_severity_count: 'شکایت با شدت بالا',
+  returned_checks: 'چک برگشتی',
+  returned_check_count: 'چک برگشتی',
+  complaint_linked_lab_rejections: 'رد آزمایشگاه مرتبط با شکایت',
+  historical_wallet_share_pct: 'برآورد تاریخی سهم از سبد',
+  historical_total_revenue: 'فروش تاریخی تجمعی',
+  known_margin_pct: 'حاشیه سود شناخته‌شده',
+  actual_cost_coverage_pct: 'پوشش هزینه واقعی',
+  profitability_status: 'وضعیت سودآوری',
+};
+
+function signalTitle(signal: CustomerSignal): string {
+  return `${SIGNAL_LABELS[signal.type]} (${signal.type})`;
+}
+
+function metricText(signal: CustomerSignal): string {
+  const metrics = signal.metrics
+    .map((metric) => `${METRIC_LABELS[metric.name] ?? metric.name}: ${metric.value ?? UNAVAILABLE}`)
+    .join('، ');
+  return metrics ? `${signalTitle(signal)} — ${metrics}` : signalTitle(signal);
+}
+
+function textField(record: Record<string, string | number | boolean | null>, key: string): string {
+  const value = record[key];
+  return typeof value === 'string' && value ? value : UNAVAILABLE;
+}
+
+function numberField(record: Record<string, string | number | boolean | null>, key: string): number {
+  const value = record[key];
+  return typeof value === 'number' ? value : Number.NaN;
+}
+
+function buildPresentationSignals(data: Customer360Response): CustomerSignal[] {
+  const evidence = data.recommendation.evidence;
+  const qualityMetrics = evidence
+    .filter((item) => item.metric === 'open_complaint_count' || item.metric === 'high_severity_count')
+    .map((item) => ({ name: item.metric, value: item.value, source: item.source }));
+  const paymentMetrics = evidence
+    .filter((item) => item.metric === 'returned_check_count')
+    .map((item) => ({ name: item.metric, value: item.value, source: item.source }));
+  const signals: CustomerSignal[] = [];
+  if (qualityMetrics.length) signals.push({ type: 'QUALITY_RISK', severity: 'HIGH', title: 'Quality risk', metrics: qualityMetrics });
+  if (paymentMetrics.length) signals.push({ type: 'PAYMENT_RISK', severity: 'HIGH', title: 'Payment risk', metrics: paymentMetrics });
+  if (data.recommendation.suspended_opportunities.some((item) => item.recommendation_type === 'GROW')) {
+    signals.push({ type: 'GROWTH_SIGNAL', severity: 'MEDIUM', title: 'Suspended growth opportunity', metrics: [] });
+  }
+  return signals;
+}
+
+function buildCustomer360ViewModel(data: Customer360Response) {
+  const { profile, commercial, financial, recommendation } = data;
+  const rfm = data.rfm;
+  const signals = buildPresentationSignals(data);
+  const lastInteraction = data.interactions[0];
+
+  return {
+    customer_id: data.customer_id,
+    customer_name: profile.customer_name ?? UNAVAILABLE,
+    customer_segment: profile.segment ?? UNAVAILABLE,
+    location_name: profile.location ?? UNAVAILABLE,
+    sales_rep_name: profile.sales_rep ?? UNAVAILABLE,
+    last_purchase_date: commercial.last_invoice?.invoice_date ?? UNAVAILABLE,
+    last_interaction_date: lastInteraction ? textField(lastInteraction, 'event_time') : UNAVAILABLE,
+    lifetime_revenue: commercial.lifetime_revenue ?? Number.NaN,
+    health_status: recommendation.recommendation_type ?? 'insufficient_evidence',
+    rfm_score: rfm.available ? `${rfm.r_score}${rfm.f_score}${rfm.m_score}` : UNAVAILABLE,
+    overview: {
+      ai_summary: recommendation.summary ?? 'شواهد کافی برای پیشنهاد اقدام وجود ندارد.',
+      key_signals: signals.map(metricText),
+    },
+    sales_monthly: [],
+    financial: {
+      credit_limit: financial.credit_limit ?? Number.NaN,
+      outstanding_amount: financial.outstanding_amount ?? Number.NaN,
+      avg_delay_days: financial.median_payment_delay_days ?? Number.NaN,
+      bounced_checks_count: financial.returned_check_count,
+      recent_invoices: commercial.last_invoice ? [{
+        invoice_no: commercial.last_invoice.invoice_number ?? UNAVAILABLE,
+        date: commercial.last_invoice.invoice_date ?? UNAVAILABLE,
+        amount: commercial.last_invoice.amount ?? Number.NaN,
+        due_date: UNAVAILABLE,
+        delay_days: UNAVAILABLE,
+        status: UNAVAILABLE,
+      }] : [],
+    },
+    complaints: data.complaints.map((item) => ({
+      id: textField(item, 'complaint_id'), title: textField(item, 'title'),
+      severity: textField(item, 'severity'), text: textField(item, 'text'),
+      product_id: textField(item, 'product_id'), lot_id: UNAVAILABLE,
+      lab_result: UNAVAILABLE, resolution_text: textField(item, 'resolution'),
+    })),
+    interactions: data.interactions.map((item) => ({
+      id: textField(item, 'interaction_id'), type: textField(item, 'interaction_type'),
+      date: textField(item, 'event_time'), summary: textField(item, 'summary'),
+      next_action: textField(item, 'next_action'),
+    })),
+    offers: data.offers.map((item) => ({
+      id: textField(item, 'offer_id'), date: textField(item, 'offer_date'),
+      product_family: textField(item, 'product_group'), base_price: numberField(item, 'base_price_per_unit'),
+      offered_price: numberField(item, 'offered_price_per_unit'),
+      discount_pct: numberField(item, 'discount_pct') * 100, status: textField(item, 'result'),
+    })),
+    products: data.products.map((item) => ({
+      name: textField(item, 'description'), product_id: textField(item, 'product_id'),
+      volume_kg: numberField(item, 'purchased_quantity'), trend: UNAVAILABLE,
+    })),
+    ai_insights: {
+      patterns: signals.map(metricText),
+      recommendations: recommendation.next_best_action ? [recommendation.next_best_action] : [],
+    },
+    returns: {
+      returned_quantity_kg: Number.NaN,
+      returned_value: Number.NaN,
+      return_rate_pct: Number.NaN,
+      reasons: [],
+    },
+    risks_opportunities: {
+      active_risks: signals.filter((signal) => signal.type === 'QUALITY_RISK' || signal.type === 'PAYMENT_RISK').map((signal) => ({
+        title: signalTitle(signal),
+        severity: signal.severity,
+        probability: UNAVAILABLE,
+        impact: metricText(signal),
+      })),
+      active_opportunities: signals.filter((signal) => signal.type === 'GROWTH_SIGNAL').map((signal) => ({
+        title: signalTitle(signal),
+        probability: signal.severity,
+        impact: metricText(signal),
+      })),
+    },
+    rfm: {
+      recency_days: rfm.available ? rfm.recency : Number.NaN,
+      frequency_orders: rfm.available ? rfm.frequency : Number.NaN,
+      monetary_value: rfm.available ? rfm.monetary : Number.NaN,
+      rfm_segment: rfm.available ? rfm.segment : UNAVAILABLE,
+    },
+    nba: {
+      recommended_action: recommendation.next_best_action ?? UNAVAILABLE,
+      priority: recommendation.priority ?? UNAVAILABLE,
+      rationale: recommendation.summary ?? UNAVAILABLE,
+      expected_impact: UNAVAILABLE,
+      contact_deadline: UNAVAILABLE,
+    },
+    evidence_and_trust: {
+      risk_score_factors: recommendation.evidence.map((item) => ({
+        factor: item.metric,
+        value: item.value ?? UNAVAILABLE,
+        weight: item.evidence_type,
+        confidence: `${item.source} — ${item.note}`,
+      })),
+      overall_confidence: recommendation.confidence,
+    },
+  };
+}
+
+function formatNumber(value: number, suffix = ''): string {
+  return Number.isFinite(value) ? `${value.toLocaleString('fa-IR')}${suffix}` : UNAVAILABLE;
+}
+
+function formatMillions(value: number, digits = 0): string {
+  return Number.isFinite(value) ? `${(value / 1_000_000).toFixed(digits)} م.ر` : UNAVAILABLE;
+}
 
 export const Customer360Page: React.FC<Customer360PageProps> = ({
   selectedCustomerId,
   onSelectCustomer,
   onOpenCobat,
 }) => {
-  const { customers, installmentProfitRatePct, setSelectedCustomerId } = useCopan();
+  const { customers, setSelectedCustomerId } = useCopan();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
   // Customer search & switcher state
@@ -93,7 +266,80 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
   const [qualityModalOpen, setQualityModalOpen] = useState(false);
   const [actionModalOpen, setActionModalOpen] = useState(false);
 
-  const c360 = getDetailedCustomer360(selectedCustomerId);
+  const [customer360Data, setCustomer360Data] = useState<Customer360Response | null>(null);
+  const [customer360Error, setCustomer360Error] = useState<string | null>(null);
+  const [isCustomer360Loading, setIsCustomer360Loading] = useState(true);
+  const [reloadToken, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    let isCurrent = true;
+    setIsCustomer360Loading(true);
+    setCustomer360Error(null);
+
+    fetchCustomer360(selectedCustomerId)
+      .then((response) => {
+        if (isCurrent) setCustomer360Data(response);
+      })
+      .catch((error: unknown) => {
+        if (!isCurrent) return;
+        setCustomer360Data(null);
+        setCustomer360Error(
+          error instanceof Error ? error.message : 'دریافت اطلاعات مشتری ناموفق بود.',
+        );
+      })
+      .finally(() => {
+        if (isCurrent) setIsCustomer360Loading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedCustomerId, reloadToken]);
+
+  if (
+    isCustomer360Loading ||
+    (customer360Data !== null && customer360Data.customer_id !== selectedCustomerId)
+  ) {
+    return (
+      <div className="copan-card min-h-[320px] flex flex-col items-center justify-center gap-3">
+        <RotateCcw size={26} className="animate-spin text-[var(--gold)]" />
+        <span className="text-[13px] font-bold text-[var(--text-dim)]">
+          در حال دریافت نمای هوشمند مشتری...
+        </span>
+      </div>
+    );
+  }
+
+  if (customer360Error || !customer360Data) {
+    return (
+      <div className="copan-card min-h-[320px] flex flex-col items-center justify-center gap-3 text-center">
+        <AlertTriangle size={28} className="text-[var(--risk)]" />
+        <div className="font-bold text-[var(--text)]">اطلاعات مشتری بارگذاری نشد</div>
+        <div className="text-[12px] text-[var(--text-faint)]">{customer360Error ?? UNAVAILABLE}</div>
+        <button
+          type="button"
+          className="copan-btn copan-btn-secondary"
+          onClick={() => setReloadToken((value) => value + 1)}
+        >
+          تلاش مجدد
+        </button>
+      </div>
+    );
+  }
+
+  const c360 = buildCustomer360ViewModel(customer360Data);
+  const recommendation = customer360Data.recommendation;
+  const allSignals = buildPresentationSignals(customer360Data);
+  const recommendationLabel = recommendation.recommendation_type
+    ? RECOMMENDATION_LABELS[recommendation.recommendation_type]
+    : UNAVAILABLE;
+  const priorityLabel = recommendation.priority
+    ? `${PRIORITY_LABELS[recommendation.priority]} (${recommendation.priority})`
+    : UNAVAILABLE;
+  const walletShare = recommendation.evidence.find((item) => item.metric === 'historical_wallet_share_pct')?.value;
+  const knownMargin = recommendation.evidence.find((item) => item.metric === 'known_margin_pct')?.value;
+  const costCoverage = recommendation.evidence.find((item) => item.metric === 'actual_cost_coverage_pct')?.value;
+  const profitabilityStatus = recommendation.evidence.find((item) => item.metric === 'profitability_status')?.value;
 
   // Selection handlers
   const handleSelect = (id: string) => {
@@ -123,15 +369,10 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
           c.location_name.toLowerCase().includes(customerSearchQuery.trim().toLowerCase())
       ).slice(0, 8)
     : [];
-
-  // Dynamic Installment Calculations
-  const cashRevenue = c360.lifetime_revenue * ((100 - c360.profitability.installment_share_pct) / 100);
-  const installmentRevenue = c360.lifetime_revenue * (c360.profitability.installment_share_pct / 100);
-  const baseMargin = c360.avg_gross_margin_pct / 100;
-  const cashProfit = cashRevenue * baseMargin;
-  const installmentProfit = installmentRevenue * (baseMargin + (installmentProfitRatePct / 100));
-  const totalGrossProfit = cashProfit + installmentProfit;
-  const effectiveGrossMarginPct = (totalGrossProfit / c360.lifetime_revenue) * 100;
+  const quickKeyCustomers = customers.slice(0, 8).map((customer) => ({
+    id: customer.customer_id,
+    name: customer.customer_name === UNAVAILABLE ? customer.customer_id : customer.customer_name,
+  }));
 
   const handleExportReport = () => {
     const headers = ['بخش تحلیل', 'شاخص', 'مقدار'];
@@ -139,12 +380,11 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
       ['اطلاعات پایه', 'نام مشتری', c360.customer_name],
       ['اطلاعات پایه', 'کد مشتری', c360.customer_id],
       ['اطلاعات پایه', 'سگمنت', c360.customer_segment],
-      ['فروش', 'فروش کل تجمعی', `${(c360.lifetime_revenue / 1000000).toFixed(0)} م.ر`],
-      ['سودآوری', 'نرخ سود اقساطی فعال', `+${installmentProfitRatePct.toFixed(1)}%`],
-      ['سودآوری', 'سود ناخالص موثر', `${(totalGrossProfit / 1000000).toFixed(1)} م.ر`],
-      ['سودآوری', 'حاشیه سود ناخالص موثر', `${effectiveGrossMarginPct.toFixed(1)}%`],
-      ['ریسک', 'شاخص ریسک', `${c360.risk_score} / 100`],
-      ['فرصت', 'پتانسیل رشد', `${c360.opportunity_score} / 100`],
+      ['فروش', 'فروش کل تجمعی', formatMillions(c360.lifetime_revenue)],
+      ['سودآوری', 'حاشیه سود شناخته‌شده', typeof knownMargin === 'number' ? `${knownMargin}%` : UNAVAILABLE],
+      ['سودآوری', 'پوشش هزینه واقعی', typeof costCoverage === 'number' ? `${costCoverage}%` : UNAVAILABLE],
+      ['پیشنهاد', 'نوع پیشنهاد', recommendation.recommendation_type ?? UNAVAILABLE],
+      ['پیشنهاد', 'اولویت', recommendation.priority ?? UNAVAILABLE],
       ['NBA', 'اقدام بعدی', c360.nba.recommended_action],
       ['NBA', 'اثر مورد انتظار', c360.nba.expected_impact],
     ];
@@ -290,7 +530,7 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
         {/* Quick Access Account Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pt-1.5 border-t border-[var(--hair)] text-[11px]">
           <span className="text-[var(--text-faint)] shrink-0 font-medium">دسترسی سریع به حساب‌های کلیدی:</span>
-          {QUICK_KEY_CUSTOMERS.map((q) => {
+          {quickKeyCustomers.map((q) => {
             const isSelected = q.id === selectedCustomerId;
             return (
               <button
@@ -339,18 +579,17 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
                 </span>
                 <span
                   className={`copan-badge ${
-                    c360.health_status === 'At Risk'
+                    c360.health_status === 'PROTECT_FIX'
                       ? 'badge-risk'
-                      : c360.health_status === 'Needs Attention'
-                      ? 'badge-gold'
-                      : 'badge-positive'
+                      : c360.health_status === 'GROW'
+                      ? 'badge-positive'
+                      : 'badge-neutral'
                   }`}
                 >
-                  {c360.health_status === 'At Risk'
-                    ? 'در معرض ریزش'
-                    : c360.health_status === 'Needs Attention'
-                    ? 'نیازمند توجه'
-                    : 'سالم و پایدار'}
+                  {recommendationLabel}
+                </span>
+                <span className="copan-badge badge-neutral font-mono text-[10px]">
+                  {recommendation.recommendation_type ?? 'insufficient_evidence'}
                 </span>
               </div>
               <div className="text-[12px] text-[var(--text-dim)] mt-1 flex items-center gap-3 flex-wrap font-medium">
@@ -398,30 +637,28 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
           <div className="p-3 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)]">
             <div className="text-[11.5px] font-semibold text-[var(--text-dim)]">فروش تجمعی</div>
             <div className="font-mono font-extrabold text-[15px] text-[var(--text)] mt-0.5">
-              {(c360.lifetime_revenue / 1000000).toFixed(0)} <small className="text-[11px] font-bold text-[var(--text-dim)]">م.ر</small>
+              {formatMillions(c360.lifetime_revenue)}
             </div>
           </div>
 
           <div className="p-3 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)]">
-            <div className="text-[11.5px] font-semibold text-[var(--text-dim)]">روند فروش</div>
+            <div className="text-[11.5px] font-semibold text-[var(--text-dim)]">اولویت پیشنهاد</div>
             <div className="font-mono font-extrabold text-[15px] mt-0.5 flex items-center gap-1">
-              <span className={c360.revenue_trend_pct >= 0 ? 'text-[var(--positive)]' : 'text-[var(--risk)]'}>
-                {c360.revenue_trend_pct >= 0 ? `+${c360.revenue_trend_pct}%` : `${c360.revenue_trend_pct}%`}
-              </span>
+              <span className="text-[var(--risk)]">{priorityLabel}</span>
             </div>
           </div>
 
           <div className="p-3 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)]">
-            <div className="text-[11.5px] font-semibold text-[var(--text-dim)]">شاخص ریسک</div>
+            <div className="text-[11.5px] font-semibold text-[var(--text-dim)]">ریسک‌های مسدودکننده</div>
             <div className="font-mono font-extrabold text-[15px] text-[var(--risk)] mt-0.5">
-              {c360.risk_score} <small className="text-[10.5px] font-bold text-[var(--text-faint)]">/ ۱۰۰</small>
+              {recommendation.blocking_risks.length.toLocaleString('fa-IR')}
             </div>
           </div>
 
           <div className="p-3 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)]">
-            <div className="text-[11.5px] font-semibold text-[var(--text-dim)]">پتانسیل رشد</div>
+            <div className="text-[11.5px] font-semibold text-[var(--text-dim)]">برآورد تاریخی سهم از سبد</div>
             <div className="font-mono font-extrabold text-[15px] text-[var(--gold)] mt-0.5">
-              {c360.opportunity_score} <small className="text-[10.5px] font-bold text-[var(--text-faint)]">/ ۱۰۰</small>
+              {typeof walletShare === 'number' ? `${walletShare.toLocaleString('fa-IR')}٪` : UNAVAILABLE}
             </div>
           </div>
 
@@ -433,9 +670,9 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
           </div>
 
           <div className="p-3 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)]">
-            <div className="text-[11.5px] font-semibold text-[var(--text-dim)]">حاشیه سود با اقساط</div>
+            <div className="text-[11.5px] font-semibold text-[var(--text-dim)]">وضعیت شواهد سودآوری</div>
             <div className="font-mono font-extrabold text-[15px] text-[var(--positive)] mt-0.5">
-              {effectiveGrossMarginPct.toFixed(1)}٪
+              {profitabilityStatus === 'actual' && costCoverage === 100 ? 'واقعی؛ پوشش ۱۰۰٪' : profitabilityStatus === 'partial' ? 'پوشش جزئی' : UNAVAILABLE}
             </div>
           </div>
         </div>
@@ -477,12 +714,14 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
               <div className="flex items-center gap-2 pb-3 border-b border-[var(--hair)]">
                 <Bot size={18} className="text-[var(--gold)]" />
                 <h3 className="font-extrabold text-[15px] text-[var(--text)]">
-                  خلاصه هوشمند وضعیت حساب (AI Executive Summary)
+                  خلاصه مدیریتی مبتنی بر داده
                 </h3>
               </div>
-              <p className="text-[13px] text-[var(--text-dim)] leading-relaxed bg-[var(--panel-2)] p-4 rounded-xl border border-[var(--hair)]">
-                {c360.overview.ai_summary}
-              </p>
+              <div className="text-[13px] text-[var(--text-dim)] leading-relaxed bg-[var(--panel-2)] p-4 rounded-xl border border-[var(--hair)] space-y-3">
+                <div><b className="text-[var(--text)]">چه چیزی می‌بینیم؟</b><p>{allSignals.length ? allSignals.map(metricText).join('؛ ') : UNAVAILABLE}</p></div>
+                <div><b className="text-[var(--text)]">چرا مهم است؟</b><p>{recommendationLabel}{recommendation.suspended_opportunities.length ? '؛ فرصت رشد موجود است اما تا رفع ریسک مسدودکننده تعلیق شده است.' : ''}</p></div>
+                <div><b className="text-[var(--text)]">اقدام بعدی چیست؟</b><p>{recommendation.next_best_action ?? UNAVAILABLE}</p></div>
+              </div>
 
               <div className="space-y-2">
                 <div className="text-[12px] font-bold text-[var(--text)]">سیگنال‌های کلیدی شناسایی‌شده:</div>
@@ -505,18 +744,14 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
               <div>
                 <div className="pb-3 border-b border-[var(--hair)] flex items-center justify-between">
                   <span className="font-extrabold text-[14px] text-[var(--text)]">اقدام بعدی هوشمند (NBA)</span>
-                  <span className="copan-badge badge-risk text-[10px]">{c360.nba.priority}</span>
+                  <span className="copan-badge badge-risk text-[10px]">{priorityLabel}</span>
                 </div>
                 <div className="mt-3 p-3.5 rounded-xl bg-[var(--panel-2)] border border-[var(--hair-strong)] space-y-2">
                   <div className="font-bold text-[13px] text-[var(--text)] leading-snug">
-                    {c360.nba.recommended_action}
+                    {recommendationLabel}
                   </div>
-                  <div className="text-[11px] text-[var(--positive)] font-medium">
-                    {c360.nba.expected_impact}
-                  </div>
-                  <div className="text-[10.5px] text-[var(--text-faint)]">
-                    مهلت اقدام: <b>{c360.nba.contact_deadline}</b>
-                  </div>
+                  <div className="text-[11px] text-[var(--text-dim)] font-medium">{c360.nba.recommended_action}</div>
+                  <div className="text-[10.5px] text-[var(--text-faint)] font-mono">type: {recommendation.recommendation_type ?? UNAVAILABLE}</div>
                 </div>
               </div>
 
@@ -578,25 +813,25 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
               <div className="copan-kpi">
                 <div className="text-[11px] text-[var(--text-faint)]">سقف اعتبار مصوب</div>
                 <div className="font-mono font-bold text-[18px] text-[var(--text)] mt-1">
-                  {(c360.financial.credit_limit / 1000000).toFixed(0)} م.ر
+                  {formatMillions(c360.financial.credit_limit)}
                 </div>
               </div>
               <div className="copan-kpi">
                 <div className="text-[11px] text-[var(--text-faint)]">مانده بدهی در جریان</div>
                 <div className="font-mono font-bold text-[18px] text-[var(--gold)] mt-1">
-                  {(c360.financial.outstanding_amount / 1000000).toFixed(0)} م.ر
+                  {formatMillions(c360.financial.outstanding_amount)}
                 </div>
               </div>
               <div className="copan-kpi">
                 <div className="text-[11px] text-[var(--text-faint)]">میانگین تاخیر وصول</div>
                 <div className="font-mono font-bold text-[18px] text-[var(--text)] mt-1">
-                  {c360.financial.avg_delay_days} روز
+                  {formatNumber(c360.financial.avg_delay_days, ' روز')}
                 </div>
               </div>
               <div className="copan-kpi">
                 <div className="text-[11px] text-[var(--text-faint)]">چک‌های برگشتی</div>
                 <div className="font-mono font-bold text-[18px] text-[var(--risk)] mt-1">
-                  {c360.financial.bounced_checks_count} فقره
+                  {formatNumber(c360.financial.bounced_checks_count, ' فقره')}
                 </div>
               </div>
             </div>
@@ -838,68 +1073,43 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
           </div>
         )}
 
-        {/* 9. PROFITABILITY TAB (WITH 4% INSTALLMENT PROFIT FORMULA) */}
+        {/* 9. PROFITABILITY TAB */}
         {activeTab === 'profitability' && (
           <div className="copan-card space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--hair)]">
               <div>
                 <h3 className="font-extrabold text-[15px] text-[var(--text)]">
-                  تحلیل سودآوری و فرمول سود خرید اقساطی (۴٪ Profit Consideration)
+                  وضعیت شواهد سودآوری
                 </h3>
                 <p className="text-[11.5px] text-[var(--text-faint)]">
-                  محاسبه دقیق سود ناخالص و خالص با تفکیک خرید‌های نقدی از اقساطی
+                  حاشیه سود فقط در محدوده پوشش هزینه واقعی تفسیر می‌شود.
                 </p>
               </div>
               <span className="copan-badge badge-gold font-mono text-[11px]">
-                سهم اقساط: {c360.profitability.installment_share_pct}٪
+                status: {profitabilityStatus ?? 'insufficient'}
               </span>
             </div>
-
-            {/* Formula Callout Banner */}
-            <div className="p-4 rounded-xl bg-[var(--panel-2)] border border-[var(--gold)]/40 text-[12px] text-[var(--text)] space-y-2">
-              <div className="flex items-center justify-between font-bold text-[var(--gold)]">
-                <span className="flex items-center gap-1.5">
-                  <Percent size={16} />
-                  قاعده محاسبه سود اقساط (مصوب سیستم):
-                </span>
-                <span className="copan-badge badge-gold font-mono">+{installmentProfitRatePct.toFixed(1)}٪ نرخ اقساط</span>
-              </div>
-              <p className="leading-relaxed text-[var(--text-dim)]">
-                در این سامانه، خریدهای اقساطی علاوه بر حاشیه سود پایه، با افزایش <b>+{installmentProfitRatePct.toFixed(1)}٪ نرخ سود</b> مورد سنجش قرار می‌گیرند.
-              </p>
-              <div className="font-mono text-[11px] bg-[var(--panel)] p-2 rounded-lg text-[var(--gold)] border border-[var(--hair)]">
-                Installment Gross Profit = Revenue_Installment × (Margin_Base% + {installmentProfitRatePct.toFixed(1)}%)
-              </div>
-            </div>
-
-            {/* Profitability Figures Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="p-4 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)] text-right">
-                <div className="text-[11px] text-[var(--text-faint)]">فروش کل تجمعی</div>
+                <div className="text-[11px] text-[var(--text-faint)]">وضعیت سودآوری</div>
                 <div className="font-mono font-bold text-[18px] text-[var(--text)] mt-1">
-                  {(c360.lifetime_revenue / 1000000).toFixed(0)} م.ر
+                  {profitabilityStatus === 'actual' ? 'واقعی' : profitabilityStatus === 'partial' ? 'جزئی' : UNAVAILABLE}
                 </div>
               </div>
-
               <div className="p-4 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)] text-right">
-                <div className="text-[11px] text-[var(--text-faint)]">سود ناخالص مؤثر</div>
-                <div className="font-mono font-bold text-[18px] text-[var(--positive)] mt-1">
-                  {(totalGrossProfit / 1000000).toFixed(1)} م.ر
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)] text-right">
-                <div className="text-[11px] text-[var(--text-faint)]">حاشیه سود ناخالص مؤثر</div>
+                <div className="text-[11px] text-[var(--text-faint)]">پوشش هزینه واقعی</div>
                 <div className="font-mono font-bold text-[18px] text-[var(--gold)] mt-1">
-                  {effectiveGrossMarginPct.toFixed(1)}٪
+                  {typeof costCoverage === 'number' ? `${costCoverage.toLocaleString('fa-IR')}٪` : UNAVAILABLE}
                 </div>
               </div>
-
               <div className="p-4 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)] text-right">
-                <div className="text-[11px] text-[var(--text-faint)]">حاشیه سود خالص (تخمینی)</div>
+                <div className="text-[11px] text-[var(--text-faint)]">حاشیه سود شناخته‌شده</div>
                 <div className="font-mono font-bold text-[18px] text-[var(--text)] mt-1">
-                  {(effectiveGrossMarginPct * 0.72).toFixed(1)}٪
+                  {typeof knownMargin === 'number' ? `${knownMargin.toLocaleString('fa-IR')}٪` : UNAVAILABLE}
                 </div>
+                {typeof knownMargin === 'number' && !(profitabilityStatus === 'actual' && costCoverage === 100) && (
+                  <div className="text-[10px] text-[var(--risk)] mt-1">این عدد حاشیه سود کل مشتری نیست؛ پوشش هزینه کامل نیست.</div>
+                )}
               </div>
             </div>
           </div>
@@ -916,19 +1126,19 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
               <div className="p-4 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)]">
                 <div className="text-[11px] text-[var(--text-faint)]">مقدار مرجوعی کل</div>
                 <div className="font-mono font-bold text-[18px] text-[var(--text)] mt-1">
-                  {c360.returns.returned_quantity_kg} کیلوگرم
+                  {formatNumber(c360.returns.returned_quantity_kg, ' کیلوگرم')}
                 </div>
               </div>
               <div className="p-4 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)]">
                 <div className="text-[11px] text-[var(--text-faint)]">ارزش ریالی مرجوعی</div>
                 <div className="font-mono font-bold text-[18px] text-[var(--risk)] mt-1">
-                  {(c360.returns.returned_value / 1000000).toFixed(1)} م.ر
+                  {formatMillions(c360.returns.returned_value, 1)}
                 </div>
               </div>
               <div className="p-4 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)]">
                 <div className="text-[11px] text-[var(--text-faint)]">نرخ مرجوعی دوره‌ای</div>
                 <div className="font-mono font-bold text-[18px] text-[var(--gold)] mt-1">
-                  {c360.returns.return_rate_pct}٪
+                  {formatNumber(c360.returns.return_rate_pct, '٪')}
                 </div>
               </div>
             </div>
@@ -994,27 +1204,28 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
         {/* 12. RFM TAB */}
         {activeTab === 'rfm' && (
           <div className="copan-card space-y-4">
-            <div className="font-extrabold text-[15px] text-[var(--text)] pb-3 border-b border-[var(--hair)]">
-              تحلیل ماتریس RFM (Recency, Frequency, Monetary)
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--hair)] gap-3 flex-wrap">
+              <div className="font-extrabold text-[15px] text-[var(--text)]">تحلیل ماتریس RFM (Recency, Frequency, Monetary)</div>
+              <span className="copan-badge badge-neutral text-[10px]">لنز رفتاری؛ خارج از منطق تصمیم NBA</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div className="p-4 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)]">
                 <div className="text-[11px] text-[var(--text-faint)]">فاصله آخرین خرید (Recency)</div>
                 <div className="font-mono font-bold text-[18px] text-[var(--text)] mt-1">
-                  {c360.rfm.recency_days} روز پیش
+                  {formatNumber(c360.rfm.recency_days, ' روز پیش')}
                 </div>
               </div>
               <div className="p-4 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)]">
                 <div className="text-[11px] text-[var(--text-faint)]">تعداد کل سفارشات (Frequency)</div>
                 <div className="font-mono font-bold text-[18px] text-[var(--text)] mt-1">
-                  {c360.rfm.frequency_orders} فاکتور
+                  {formatNumber(c360.rfm.frequency_orders, ' فاکتور')}
                 </div>
               </div>
               <div className="p-4 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)]">
                 <div className="text-[11px] text-[var(--text-faint)]">ارزش کل خرید (Monetary)</div>
                 <div className="font-mono font-bold text-[18px] text-[var(--gold)] mt-1">
-                  {(c360.rfm.monetary_value / 1000000).toFixed(0)} م.ر
+                  {formatMillions(c360.rfm.monetary_value)}
                 </div>
               </div>
               <div className="p-4 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)]">
@@ -1022,6 +1233,7 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
                 <div className="font-bold text-[14px] text-[var(--positive)] mt-1">
                   {c360.rfm.rfm_segment}
                 </div>
+                <div className="font-mono text-[10px] text-[var(--text-faint)] mt-1">R/F/M: {c360.rfm_score}</div>
               </div>
             </div>
           </div>
@@ -1037,17 +1249,19 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
             <div className="p-4 rounded-xl bg-[var(--panel-2)] border border-[var(--gold)]/40 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="font-extrabold text-[14px] text-[var(--text)]">
-                  {c360.nba.recommended_action}
+                  {recommendationLabel}
                 </span>
-                <span className="copan-badge badge-risk">{c360.nba.priority}</span>
+                <div className="flex items-center gap-2"><span className="copan-badge badge-neutral font-mono">{recommendation.recommendation_type ?? UNAVAILABLE}</span><span className="copan-badge badge-risk">{priorityLabel}</span></div>
               </div>
               <p className="text-[12.5px] text-[var(--text-dim)] leading-relaxed">
                 {c360.nba.rationale}
               </p>
-              <div className="pt-2 border-t border-[var(--hair)] flex items-center justify-between text-[11.5px]">
-                <span>اثر مورد انتظار: <b>{c360.nba.expected_impact}</b></span>
-                <span>مهلت اقدام: <b className="font-mono">{c360.nba.contact_deadline}</b></span>
-              </div>
+              <div className="pt-2 border-t border-[var(--hair)] text-[11.5px]"><b>اقدام:</b> {c360.nba.recommended_action}</div>
+              {recommendation.suspended_opportunities.map((item, idx) => (
+                <div key={idx} className="p-3 rounded-lg bg-[var(--gold-soft)] text-[var(--gold)] text-[11.5px]">
+                  فرصت {RECOMMENDATION_LABELS[item.recommendation_type]} فعلاً تعلیق شده است، چون ریسک مسدودکننده وجود دارد. <span className="font-mono">({item.status})</span> {item.note}
+                </div>
+              ))}
             </div>
 
             <button
@@ -1068,21 +1282,21 @@ export const Customer360Page: React.FC<Customer360PageProps> = ({
 
             <div className="space-y-3">
               <div className="text-[12px] font-bold text-[var(--text)]">
-                فاکتورهای تشکیل‌دهنده شاخص ریسک ({c360.risk_score} / ۱۰۰):
+                شواهد پشتیبان پیشنهاد:
               </div>
 
-              {c360.evidence_and_trust.risk_score_factors.map((f, idx) => (
+              {recommendation.evidence.map((item, idx) => (
                 <div
                   key={idx}
-                  className="p-3.5 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)] flex items-center justify-between text-[12px]"
+                  className="p-3.5 rounded-xl bg-[var(--panel-2)] border border-[var(--hair)] text-[12px] grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3"
                 >
                   <div>
-                    <div className="font-bold text-[var(--text)]">{f.factor}</div>
-                    <div className="text-[10.5px] text-[var(--text-faint)]">منبع داده: {f.confidence}</div>
+                    <div className="font-bold text-[var(--text)]">{METRIC_LABELS[item.metric] ?? item.metric} <span className="font-mono text-[10px] text-[var(--text-faint)]">({item.metric})</span></div>
+                    <div className="text-[10.5px] text-[var(--text-faint)] mt-1">یادداشت: {item.note || UNAVAILABLE}</div>
                   </div>
-                  <div className="text-left font-mono">
-                    <span className="font-bold text-[var(--text)]">{f.value}</span>
-                    <span className="text-[10.5px] text-[var(--text-faint)] mr-2">(وزن: {f.weight})</span>
+                  <div className="md:text-left space-y-1">
+                    <div><span className="text-[var(--text-faint)]">مقدار:</span> <b className="font-mono text-[var(--text)]">{String(item.value ?? UNAVAILABLE)}</b></div>
+                    <div className="text-[10.5px] text-[var(--text-faint)]">نوع: <span className="font-mono">{item.evidence_type}</span> • منبع: {item.source}</div>
                   </div>
                 </div>
               ))}

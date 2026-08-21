@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from .services.customer_intelligence_service import get_customer_intelligence
+from .services.customer_360_service import get_customer_360
 from .services.customer_service import get_all_customers, get_customer_by_id
 from .services.dashboard_service import get_dashboard_summary
 from .services.recommendation_service import (
@@ -61,6 +62,14 @@ def customer_intelligence(customer_id: str):
     if intelligence is None:
         raise HTTPException(status_code=404, detail="Customer not found")
     return intelligence
+
+
+@app.get("/api/customers/{customer_id}/360")
+def customer_360(customer_id: str):
+    result = get_customer_360(customer_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return result
 
 
 @app.get("/api/recommendations")

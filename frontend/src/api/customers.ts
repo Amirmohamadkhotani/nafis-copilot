@@ -1,5 +1,6 @@
 import type {
   CustomerIntelligenceResponse,
+  Customer360Response,
   CustomerListItem,
   CustomerMasterRecord,
   CustomerRecommendation,
@@ -28,6 +29,10 @@ export function fetchCustomerIntelligence(
   );
 }
 
+export function fetchCustomer360(customerId: string): Promise<Customer360Response> {
+  return apiGet<Customer360Response>(`/customers/${encodeURIComponent(customerId)}/360`);
+}
+
 export function fetchCustomerRecommendation(
   customerId: string,
 ): Promise<CustomerRecommendation> {
@@ -39,7 +44,6 @@ export function fetchCustomerRecommendation(
 // Compatibility aliases for callers that have not yet adopted the canonical names.
 export const fetchAccounts = fetchCustomers;
 export const fetchCustomerContract = fetchCustomerRecord;
-export const fetchCustomer360 = fetchCustomerIntelligence;
 
 function unsupportedFeature(): Promise<UnavailableFeature> {
   return Promise.resolve({ available: false, reason: 'not_supported_by_backend' });

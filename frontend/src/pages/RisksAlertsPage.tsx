@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Bot,
   Zap,
   Layers,
 } from 'lucide-react';
 import type { PageId } from '../components/layout/Sidebar';
-import { COPAN_RISKS_REGISTRY, type CopanRiskItem } from '../data/copanIntelligence';
+import type { CopanRiskItem } from '../data/copanIntelligence';
+import { fetchRecommendations } from '../api';
 import { ActionModal } from '../components/modals/ActionModal';
 import { QualityChainModal } from '../components/modals/QualityChainModal';
 
@@ -28,8 +29,31 @@ export const RisksAlertsPage: React.FC<RisksAlertsPageProps> = ({
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [qualityModalOpen, setQualityModalOpen] = useState(false);
   const [activeRiskItem, setActiveRiskItem] = useState<CopanRiskItem | null>(null);
+  const [risks, setRisks] = useState<CopanRiskItem[]>([]);
 
-  const filteredRisks = COPAN_RISKS_REGISTRY.filter((r) => {
+  useEffect(() => {
+    let current = true;
+    fetchRecommendations('PROTECT_FIX').then((response) => {
+      if (!current) return;
+      setRisks(response.recommendations.map((item) => ({
+        id: `REC-${item.customer_id}`,
+        risk_category: 'CUSTOMER',
+        category_label: 'ریسک مسدودکننده مشتری',
+        entity_id: item.customer_id,
+        entity_name: 'داده کافی موجود نیست',
+        risk_title: item.summary ?? 'رفع ریسک پیش از توسعه فروش',
+        severity: item.priority,
+        probability_pct: Number.NaN,
+        financial_impact: Number.NaN,
+        evidence: item.blocking_risks,
+        recommended_action: item.next_best_action ?? 'داده کافی موجود نیست',
+        risk_score: Number.NaN,
+      })));
+    }).catch(() => { if (current) setRisks([]); });
+    return () => { current = false; };
+  }, []);
+
+  const filteredRisks = risks.filter((r) => {
     if (categoryFilter !== 'ALL' && r.risk_category !== categoryFilter) return false;
     return true;
   });
@@ -74,7 +98,7 @@ export const RisksAlertsPage: React.FC<RisksAlertsPageProps> = ({
           >
             <div className="text-[11.5px] font-semibold text-[var(--text-dim)]">کل ریسک‌های فعال</div>
             <div className="font-mono font-black text-[19px] text-[var(--text)] mt-1">
-              {COPAN_RISKS_REGISTRY.length} ریسک
+              {risks.length} ریسک
             </div>
           </button>
 
@@ -88,7 +112,7 @@ export const RisksAlertsPage: React.FC<RisksAlertsPageProps> = ({
           >
             <div className="text-[11.5px] font-semibold text-[var(--risk)]">۱. هشدار ضرر و حاشیه سود</div>
             <div className="font-mono font-black text-[19px] text-[var(--risk)] mt-1">
-              {COPAN_RISKS_REGISTRY.filter((r) => r.risk_category === 'MARGIN_LOSS').length} مورد
+              {risks.filter((r) => r.risk_category === 'MARGIN_LOSS').length} مورد
             </div>
           </button>
 
@@ -102,7 +126,7 @@ export const RisksAlertsPage: React.FC<RisksAlertsPageProps> = ({
           >
             <div className="text-[11.5px] font-semibold text-[#c26227]">۲. هشدار ریزش مشتری</div>
             <div className="font-mono font-black text-[19px] text-[#c26227] mt-1">
-              {COPAN_RISKS_REGISTRY.filter((r) => r.risk_category === 'CUSTOMER').length} مورد
+              {risks.filter((r) => r.risk_category === 'CUSTOMER').length} مورد
             </div>
           </button>
 
@@ -116,7 +140,7 @@ export const RisksAlertsPage: React.FC<RisksAlertsPageProps> = ({
           >
             <div className="text-[11.5px] font-semibold text-[var(--gold)]">۳. هشدار کیفیت و کالا</div>
             <div className="font-mono font-black text-[19px] text-[var(--gold)] mt-1">
-              {COPAN_RISKS_REGISTRY.filter((r) => r.risk_category === 'PRODUCT').length} مورد
+              {risks.filter((r) => r.risk_category === 'PRODUCT').length} مورد
             </div>
           </button>
 
@@ -130,7 +154,7 @@ export const RisksAlertsPage: React.FC<RisksAlertsPageProps> = ({
           >
             <div className="text-[11.5px] font-semibold text-[var(--teal)]">۴. هشدار تهدید رقبا</div>
             <div className="font-mono font-black text-[19px] text-[var(--teal)] mt-1">
-              {COPAN_RISKS_REGISTRY.filter((r) => r.risk_category === 'COMMERCIAL').length} مورد
+              {risks.filter((r) => r.risk_category === 'COMMERCIAL').length} مورد
             </div>
           </button>
         </div>
@@ -176,10 +200,10 @@ export const RisksAlertsPage: React.FC<RisksAlertsPageProps> = ({
 
               <div className="flex items-center gap-3 text-[12px]">
                 <span className="text-[var(--text-faint)]">احتمال وقوع:</span>
-                <span className="font-mono font-bold text-[var(--text)]">{risk.probability_pct}٪</span>
+                <span className="font-mono font-bold text-[var(--text)]">{Number.isFinite(risk.probability_pct) ? `${risk.probability_pct}٪` : 'داده کافی موجود نیست'}</span>
                 <span className="text-[var(--text-faint)] mr-2">مبلغ در معرض خطر:</span>
                 <b className="font-mono text-[14px] text-[var(--risk)]">
-                  {(risk.financial_impact / 1000000).toFixed(0)} م.ر
+                  {Number.isFinite(risk.financial_impact) ? `${(risk.financial_impact / 1000000).toFixed(0)} م.ر` : 'داده کافی موجود نیست'}
                 </b>
               </div>
             </div>

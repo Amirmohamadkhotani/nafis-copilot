@@ -26,7 +26,7 @@ export const InteractionReportingModal: React.FC<InteractionReportingModalProps>
 }) => {
   const { customers, logInteraction } = useCopan();
 
-  const [customerId, setCustomerId] = useState(initialCustomerId || 'CUST-008');
+  const [customerId, setCustomerId] = useState(initialCustomerId || '');
   const [interactionType, setInteractionType] = useState<InteractionType>('تماس تلفنی');
   const [summaryText, setSummaryText] = useState('');
   const [customerFeedback, setCustomerFeedback] = useState('');

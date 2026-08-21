@@ -9,7 +9,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import type { PageId } from './Sidebar';
-import { COPAN_CUSTOMERS } from '../../data/copanIntelligence';
+import { useCopan } from '../../context/CopanContext';
 
 interface HeaderProps {
   currentPage: PageId;
@@ -75,11 +75,12 @@ export const Header: React.FC<HeaderProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const { customers } = useCopan();
 
   const activePageInfo = PAGE_TITLES[currentPage] || PAGE_TITLES.dashboard;
 
   const filteredCustomers = searchQuery.trim()
-    ? COPAN_CUSTOMERS.filter(
+    ? customers.filter(
         (c) =>
           c.customer_name.includes(searchQuery.trim()) ||
           c.customer_id.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
@@ -171,7 +172,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Period Chip */}
           <div className="hidden xl:flex items-center gap-1.5 chip">
             <Calendar size={13} className="text-[var(--gold)]" />
-            <span>بازه: <b>۱۴۰۴/۰۱ تا ۱۴۰۴/۱۲</b></span>
+            <span>بازه: <b>داده کافی موجود نیست</b></span>
           </div>
 
           <div className="hidden sm:flex items-center gap-1.5 chip warn">
@@ -195,37 +196,12 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="absolute top-full left-0 sm:right-auto sm:left-0 mt-2 w-80 bg-[var(--panel)] border border-[var(--hair-strong)] rounded-xl shadow-2xl z-50 p-3 space-y-2 text-right">
                 <div className="flex items-center justify-between pb-2 border-b border-[var(--hair)]">
                   <span className="font-bold text-[12px] text-[var(--text)]">هشدارهای بحرانی سیستم</span>
-                  <span className="text-[10.5px] font-mono text-[var(--risk)]">۳ مورد فوری</span>
+                  <span className="text-[10.5px] font-mono text-[var(--text-faint)]">داده کافی موجود نیست</span>
                 </div>
                 <div className="space-y-1.5 text-[11.5px]">
-                  <div
-                    onClick={() => {
-                      onSelectCustomer('CUST-008');
-                      onNavigate('customer_360');
-                      setShowNotifications(false);
-                    }}
-                    className="p-2 rounded-lg bg-[var(--risk-soft)] border border-[var(--risk-border)] cursor-pointer hover:opacity-90"
-                  >
-                    <div className="font-bold text-[var(--risk)] flex items-center gap-1">
-                      <AlertTriangle size={13} />
-                      خطر ریزش حساب سبلان پارچه
-                    </div>
-                    <div className="text-[10.5px] text-[var(--text-dim)] mt-0.5">
-                      افت ۳۴.۵٪ سفارشات و ۲ شکایت باز کیفیت
-                    </div>
-                  </div>
-                  <div
-                    onClick={() => {
-                      onSelectCustomer('C_535756');
-                      onNavigate('customer_360');
-                      setShowNotifications(false);
-                    }}
-                    className="p-2 rounded-lg bg-[var(--panel-2)] border border-[var(--hair)] cursor-pointer hover:bg-[var(--panel-3)]"
-                  >
-                    <div className="font-bold text-[var(--gold)]">۲ چک برگشتی پرنیان مشهد</div>
-                    <div className="text-[10.5px] text-[var(--text-dim)] mt-0.5">
-                      سررسید ۳۸ روز تاخیر به مبلغ ۳۸ م.ر
-                    </div>
+                  <div className="p-3 rounded-lg bg-[var(--panel-2)] border border-[var(--hair)] text-[var(--text-faint)] flex items-center gap-2">
+                    <AlertTriangle size={13} />
+                    برای هشدارهای عملیاتی endpoint پشتیبان موجود نیست.
                   </div>
                 </div>
               </div>
